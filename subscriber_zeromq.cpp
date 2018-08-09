@@ -8,9 +8,9 @@ class zeromq_subscriber_c : public subscriber_c
 public:
     virtual ~zeromq_subscriber_c()
     {
-        for (auto & subscription : subscriptions_m)
+        for (auto & [path, subscription] : subscriptions_m)
         {
-            zmq_setsockopt(subscriber_pm, ZMQ_UNSUBSCRIBE, &subscription.second.key_m, cps_api_key_get_len(&subscription.second.key_m));
+            zmq_setsockopt(subscriber_pm, ZMQ_UNSUBSCRIBE, &subscription.key_m, cps_api_key_get_len(&subscription.key_m));
         }
 
         zmq_close(subscriber_pm);
@@ -53,10 +53,10 @@ public:
             }
         }
 
-        for (auto & subscription : subscriptions_m)
+        for (auto & [path, subscription] : subscriptions_m)
         {
-            size_t key_len = cps_api_key_get_len(&subscription.second.key_m);
-            rc = zmq_setsockopt(subscriber_pm, ZMQ_SUBSCRIBE, &subscription.second.key_m, key_len);
+            size_t key_len = cps_api_key_get_len(&subscription.key_m);
+            rc = zmq_setsockopt(subscriber_pm, ZMQ_SUBSCRIBE, &subscription.key_m, key_len);
             if (rc != 0)
             {
                 std::cerr << "zmq_setsockopt() failed with errno=" << errno << " (" << strerror(errno) << ')' << std::endl;

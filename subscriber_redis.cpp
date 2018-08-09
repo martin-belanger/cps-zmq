@@ -35,12 +35,12 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        for (auto & subscription : subscriptions_m)
+        for (auto & [path, subscription] : subscriptions_m)
         {
             cps_api_event_reg_t reg;
 
             reg.priority          = 0;
-            reg.objects           = &subscription.second.key_m;
+            reg.objects           = &subscription.key_m;
             reg.number_of_objects = 1;
 
             rc = cps_api_event_thread_reg(&reg, redis_subscriber_c::callback, this);

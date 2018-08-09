@@ -1,15 +1,15 @@
 #include <stdlib.h>
 #include "defs.h"
 
-class redis_subscriber_context_c : public subscriber_context_c
+class redis_subscriber_c : public subscriber_c
 {
 public:
-    virtual ~redis_subscriber_context_c() {}
+    virtual ~redis_subscriber_c() {}
 
-    redis_subscriber_context_c(const volatile int  * sigterm_p,
-                               const str_list_t    & cat_lst_r) : subscriber_context_c(sigterm_p, cat_lst_r)
+    redis_subscriber_c(const volatile int  & sigterm_r,
+                       const str_list_t    & cat_lst_r) : subscriber_c(sigterm_r, cat_lst_r)
     {
-        std::cout << "REDIS " << join(cat_lst_rm) << " subscriber. Connecting to publisher." << std::endl;
+        std::cout << "REDIS " << join(cat_lst_r) << " subscriber. Connecting to publisher." << std::endl;
 
         // Initialize CPS framework
         cps_api_return_code_t rc;
@@ -35,24 +35,15 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        for (auto const& subscription : subscriptions_m)
+        for (auto & subscription : subscriptions_m)
         {
-            cps_api_key_t  key;
-
-            // Register for CPS events
-            if (!cps_api_key_from_attr_with_qual(&key, subscription.second.key_id, cps_api_qualifier_TARGET))
-            {
-                std::cerr << "cps_api_key_from_attr_with_qual() failed" << std::endl;
-                exit(EXIT_FAILURE);
-            }
-
             cps_api_event_reg_t reg;
 
             reg.priority          = 0;
-            reg.objects           = &key;
+            reg.objects           = &subscription.second.key_m;
             reg.number_of_objects = 1;
 
-            rc = cps_api_event_thread_reg(&reg, redis_subscriber_context_c::callback, this);
+            rc = cps_api_event_thread_reg(&reg, redis_subscriber_c::callback, this);
             if (rc != cps_api_ret_code_OK) {
                 std::cerr << "cps_api_event_thread_reg() failed with rc=" << rc << std::endl;
                 exit(EXIT_FAILURE);
@@ -66,13 +57,13 @@ public:
         {
             pause();
 
-        } while (*sigterm_pm == 0);
+        } while (sigterm_rm == 0);
     }
 
 private:
     static bool callback(cps_api_object_t obj, void * context_p)
     {
-        redis_subscriber_context_c * redis_context_p = (redis_subscriber_context_c *)context_p;
+        redis_subscriber_c * redis_context_p = (redis_subscriber_c *)context_p;
         redis_context_p->process_event(obj);
         return true;
     }

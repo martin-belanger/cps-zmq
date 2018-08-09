@@ -3,14 +3,14 @@
 #include <string.h>
 #include "defs.h"
 
-class zeromq_subscriber_context_c : public subscriber_context_c
+class zeromq_subscriber_c : public subscriber_c
 {
 public:
-    virtual ~zeromq_subscriber_context_c()
+    virtual ~zeromq_subscriber_c()
     {
-        for (auto cat : cat_lst_rm)
+        for (auto & subscription : subscriptions_m)
         {
-            zmq_setsockopt(subscriber_pm, ZMQ_UNSUBSCRIBE, cat.c_str(), cat.length());
+            zmq_setsockopt(subscriber_pm, ZMQ_UNSUBSCRIBE, &subscription.second.key_m, cps_api_key_get_len(&subscription.second.key_m));
         }
 
         zmq_close(subscriber_pm);
@@ -20,14 +20,15 @@ public:
         ctx_pm = NULL;
     }
 
-    zeromq_subscriber_context_c(const volatile int  * sigterm_p,
-                                const str_list_t    & cat_lst_r,
-                                const str_list_t    & url_lst_r) : subscriber_context_c(sigterm_p, cat_lst_r)
+    zeromq_subscriber_c(const volatile int  & sigterm_r,
+                        const str_list_t    & cat_lst_r,
+                        const str_list_t    & url_lst_r) : subscriber_c(sigterm_r, cat_lst_r)
     {
         int rc;
 
-        std::cout << "ZEROMQ " << join(cat_lst_rm, "+") << " subscriber. Connect to: \"" << join(url_lst_r, "+") << "\"." << std::endl;
+        std::cout << "ZEROMQ " << join(cat_lst_r, "+") << " subscriber. Connect to: \"" << join(url_lst_r, "+") << "\"." << std::endl;
 
+        // Initialize ZMQ framework
         ctx_pm = zmq_ctx_new();
         if (ctx_pm == NULL)
         {
@@ -52,9 +53,10 @@ public:
             }
         }
 
-        for (auto cat : cat_lst_rm)
+        for (auto & subscription : subscriptions_m)
         {
-            rc = zmq_setsockopt(subscriber_pm, ZMQ_SUBSCRIBE, cat.c_str(), cat.length());
+            size_t key_len = cps_api_key_get_len(&subscription.second.key_m);
+            rc = zmq_setsockopt(subscriber_pm, ZMQ_SUBSCRIBE, &subscription.second.key_m, key_len);
             if (rc != 0)
             {
                 std::cerr << "zmq_setsockopt() failed with errno=" << errno << " (" << strerror(errno) << ')' << std::endl;
@@ -78,40 +80,32 @@ public:
             zmq_msg_init(&message);
             size = zmq_recvmsg(subscriber_pm, &message, 0);
 
-            if ((size == -1) && (errno != EINTR))
-            {
-                std::cerr << "zmq_recvmsg() failed with errno=" << errno << " (" << strerror(errno) << ')' << std::endl;
-                exit(EXIT_FAILURE);
-            }
-
-            if (*sigterm_pm != 0)
+            if (sigterm_rm != 0)
             {
                 zmq_msg_close(&message);
                 break;
             }
 
-            if (size != -1)
+            if (size == -1)
             {
-                /* Determine if more message parts are to follow */
-                rc = zmq_getsockopt(subscriber_pm, ZMQ_RCVMORE, &more, &more_size);
-                if (rc != 0)
+                if (errno != EINTR)
                 {
-                    std::cerr << "zmq_getsockopt() failed with errno=" << errno << " (" << strerror(errno) << ')' << std::endl;
+                    zmq_msg_close(&message);
+                    std::cerr << "zmq_recvmsg() failed with errno=" << errno << " (" << strerror(errno) << ')' << std::endl;
                     exit(EXIT_FAILURE);
                 }
+            }
+            else
+            {
+                if (!cps_api_array_to_object(zmq_msg_data(&message), size, obj))
+                    std::cerr << "cps_api_array_to_object() failed" << std::endl;
 
-                if (!more)
-                {
-                    if (!cps_api_array_to_object(zmq_msg_data(&message), size, obj))
-                        std::cerr << "cps_api_array_to_object() failed" << std::endl;
-
-                    process_event(obj);
-                }
+                process_event(obj);
             }
 
             zmq_msg_close(&message);
 
-        } while (*sigterm_pm == 0);
+        } while (sigterm_rm == 0);
     }
 
 private:

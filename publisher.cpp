@@ -13,28 +13,26 @@
 
 #include "args.cpp"
 
-static inline uint64_t now_nsec()
-{
-    struct timespec  now_time;
-    clock_gettime(CLOCK_MONOTONIC, &now_time);
-
-    return ((uint64_t)now_time.tv_sec * 1000000000) + now_time.tv_nsec;
-}
-
 /******************************************************************************/
-class publisher_context_c
+class publisher_c
 {
+protected:
+    unsigned long int     num_m;      // Number of messages in a transmit burst.
+    volatile int        & sighup_rm;  // Variable that gets changed by SIGHUP and is used to trigger a burst of messages.
+    const volatile int  & sigterm_rm; // Variable that gets changed by SIGTERM and is used to terminate the program.
+    benchmark::Object   * obj_pm;     // CPS object to be transmitted in each pub/sub message sent.
+
 public:
-    virtual ~publisher_context_c()
+    virtual ~publisher_c()
     {
         delete obj_pm;
         obj_pm = NULL;
     }
 
-    publisher_context_c(unsigned long int    num,
-                        volatile int       * sighup_p,
-                        const volatile int * sigterm_p,
-                        const std::string  & cat_r) : cat_rm(cat_r), num_m(num), sighup_pm(sighup_p), sigterm_pm(sigterm_p)
+    publisher_c(unsigned long int    num,
+                volatile int       & sighup_r,
+                const volatile int & sigterm_r,
+                const std::string  & cat_r) : num_m(num), sighup_rm(sighup_r), sigterm_rm(sigterm_r)
     {
         int rc = module_init();
         if (rc != 0)
@@ -43,7 +41,9 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        // Build CPS object that will be sent as an event
+        // Build CPS object that will be sent as an event. We need only
+        // create a single object. The same object will be reused for
+        // all the transmitted messages.
         if (cat_r == "alarm")
         {
             benchmark::Alarm * alarm_p = new benchmark::Alarm();
@@ -78,33 +78,47 @@ public:
         obj_pm->set_last_seq_no((uint32_t)num);
     }
 
+    /**
+     * This sends a burst of messages. Note that we need to periodically pause
+     * the publisher (using usleep) to allow context switches to take place.
+     * Failure to pause the publisher would simply results in queues
+     * overflowing and messages being dropped.
+     */
     void send_events()
     {
         //std::cout << "Publisher start sending " << num_m << " events." << std::endl;
         unsigned long int seq_no;
-        for (seq_no = 1; (*sigterm_pm == 0) && (seq_no <= num_m); seq_no++)
+        for (seq_no = 1; (sigterm_rm == 0) && (seq_no <= num_m); seq_no++)
         {
             obj_pm->set_seq_no(seq_no);
             obj_pm->set_timestamp_ns(now_nsec());
             send_one_event(obj_pm);
             if ((seq_no % 8) == 0)
             {
-                usleep(1); // trigger a context switch so that subscribers get a chance to process messages
+                usleep(2); // trigger a context switch so that subscribers get a chance to process messages
             }
         }
         //std::cout << "Publisher Done sending " << num_m << " events." << std::endl;
     }
 
+    /**
+     * This method needs to be overloaded. It is used to send a single event
+     * over the pub/sub channel.
+     *
+     * @param obj_pm  Object to be sent as an event.
+     */
     virtual void send_one_event(benchmark::Object * obj_pm) = 0;
 
     virtual void main_loop() = 0;
 
-protected:
-    const std::string     cat_rm;
-    unsigned long int     num_m;
-    volatile int        * sighup_pm;
-    const volatile int  * sigterm_pm;
-    benchmark::Object   * obj_pm;
+private:
+    static inline uint64_t now_nsec()
+    {
+        struct timespec  now_time;
+        clock_gettime(CLOCK_MONOTONIC, &now_time);
+
+        return ((uint64_t)now_time.tv_sec * 1000000000) + now_time.tv_nsec;
+    }
 };
 
 #include "publisher_redis.cpp"
@@ -125,12 +139,12 @@ static void signal_hdlr(int signo)
 /******************************************************************************/
 static void publisher(const std::string & type_r, unsigned long int num, const std::string & cat_r, const std::string & url_r)
 {
-    publisher_context_c * publisher_context_p;
+    publisher_c * publisher_context_p;
 
     if (type_r == "redis")
-        publisher_context_p = new redis_publisher_context_c(num, &sighup, &sigterm, cat_r);
+        publisher_context_p = new redis_publisher_c(num, sighup, sigterm, cat_r);
     else
-        publisher_context_p = new zeromq_publisher_context_c(num, &sighup, &sigterm, cat_r, url_r);
+        publisher_context_p = new zeromq_publisher_c(num, sighup, sigterm, cat_r, url_r);
 
     struct sigaction  action;
     action.sa_handler = signal_hdlr;
@@ -167,7 +181,7 @@ int main(int argc, char **argv)
     // In this case we only want SIGTERM and SIGHUP.
     sigset_t  sigmsk;
     sigfillset(&sigmsk);
-    sigdelset(&sigmsk, SIGHUP);  // SIGHUP  -> Start burst of events
+    sigdelset(&sigmsk, SIGHUP);  // SIGHUP  -> Start burst of messages
     sigdelset(&sigmsk, SIGTERM); // SIGTERM -> Shutdown daemon
     sigprocmask(SIG_SETMASK, &sigmsk, NULL);
 

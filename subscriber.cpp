@@ -19,153 +19,71 @@
 #include "cps_api_events.h"
 #include "benchmark.hpp"
 #include "benchmark.c"
+#include "stats.cpp"
 
-class stats_c
+typedef struct
 {
-public:
-    uint32_t    exp_seq_no;          // Expected Sequence No.
-    uint32_t    missed_events_count; // A count of missed events
+    int key_id;
+    int seq_no;
+    int last_seq_no;
+    int timestamp;
 
-    double      max_time_ms;         // Maximum measured message transit time in msec
-    double      min_time_ms;         // Minimum measured message transit time in msec
-    double      total_time_ms;       // Total measured time for all messages received in the burst
-    uint32_t    num_rx_msg;          // Total number of messages received
+} ids_t;
 
-    stats_c()
-    {
-        max_time_ms         = DBL_MIN;
-        min_time_ms         = DBL_MAX;
-        total_time_ms       = 0;
-        exp_seq_no          = 0;
-        missed_events_count = 0;
-        num_rx_msg          = 0;
-    }
-
-    void processor(uint32_t  seq_no, uint32_t  last_seq_no, uint64_t  timestamp_ns)
-    {
-        if (seq_no == 1) // This marks the start of a new batch of events
-        {
-            //std::cout << "Received seq_no=1. Restarting measurements." << std::endl;
-            missed_events_count = 0;
-            num_rx_msg          = 0;
-            total_time_ms       = 0;
-            max_time_ms         = DBL_MIN;
-            min_time_ms         = DBL_MAX;
-        }
-        else if (seq_no != exp_seq_no)
-        {
-            std::cerr << "Unexpected seq_no=" << seq_no << " [" << exp_seq_no << ']' << std::endl;
-            missed_events_count += (seq_no - exp_seq_no);
-        }
-
-        double time_elapsed_ms = (double)time_elapsed_nsec(timestamp_ns) / 1000000.0;
-
-        if (time_elapsed_ms > max_time_ms)
-            max_time_ms = time_elapsed_ms;
-
-        if (time_elapsed_ms < min_time_ms)
-            min_time_ms = time_elapsed_ms;
-
-        total_time_ms += time_elapsed_ms;
-        num_rx_msg++;
-
-        if (seq_no == last_seq_no)
-        {
-            std::cout << "@@@@ Avg: " << std::setw(8) << std::setprecision(3) << std::fixed << std::right << avg() <<
-                           "   Min: " << std::setw(8) << std::setprecision(3) << std::fixed << std::right << min() <<
-                           "   Max: " << std::setw(8) << std::setprecision(3) << std::fixed << std::right << max() << " msec";
-            if (missed_events_count != 0)
-            {
-                std::cout << " >> " << missed_events_count << " missed events.";
-            }
-            std::cout << std::endl;
-        }
-
-        exp_seq_no = seq_no + 1;
-    }
-
-private:
-    inline double max() const { return max_time_ms; }
-    inline double min() const { return min_time_ms; }
-    inline double avg() const { return total_time_ms / num_rx_msg; }
-
-    static inline uint64_t time_elapsed_nsec(uint64_t start_time)
-    {
-        struct timespec  now_time;
-        clock_gettime(CLOCK_MONOTONIC, &now_time);
-
-        return (((uint64_t)now_time.tv_sec * 1000000000) + now_time.tv_nsec) - start_time;
-    }
-};
-
-class subscription_c
+static const std::map<const std::string, const ids_t> ids =
 {
-public:
-    std::string         cat;                 // Data category (alarm, connection, telemetry, vlan, weather)
-    cps_api_attr_id_t   key_id;              // PUBSUB_ALARM_OBJ, PUBSUB_CONNECTION_OBJ, PUBSUB_TELEMETRY_OBJ, PUBSUB_VLAN_OBJ, PUBSUB_WEATHER_OBJ
-    int                 seq_no_attr_id;      // Attr. id for the sequence No. in this burst of events.
-    int                 last_seq_no_attr_id; // Attr. id for the last sequence No. in this burst of events.
-    int                 timestamp_attr_id;   // Attr. id for the nsec time stamp.
-    stats_c             stats;
-
-    subscription_c() {}
-    virtual ~subscription_c() {}
-
-    subscription_c(const std::string & cat_r)
-    {
-        cat = cat_r;
-        if (cat == "alarm")
-        {
-            key_id              = PUBSUB_ALARM_OBJ;
-            seq_no_attr_id      = PUBSUB_ALARM_SEQ_NO;
-            last_seq_no_attr_id = PUBSUB_ALARM_LAST_SEQ_NO;
-            timestamp_attr_id   = PUBSUB_ALARM_TIMESTAMP_NS;
-        }
-        else if (cat == "connection")
-        {
-            key_id              = PUBSUB_CONNECTION_OBJ;
-            seq_no_attr_id      = PUBSUB_CONNECTION_SEQ_NO;
-            last_seq_no_attr_id = PUBSUB_CONNECTION_LAST_SEQ_NO;
-            timestamp_attr_id   = PUBSUB_CONNECTION_TIMESTAMP_NS;
-        }
-        else if (cat == "telemetry")
-        {
-            key_id              = PUBSUB_TELEMETRY_OBJ;
-            seq_no_attr_id      = PUBSUB_TELEMETRY_SEQ_NO;
-            last_seq_no_attr_id = PUBSUB_TELEMETRY_LAST_SEQ_NO;
-            timestamp_attr_id   = PUBSUB_TELEMETRY_TIMESTAMP_NS;
-        }
-        else if (cat == "vlan")
-        {
-            key_id              = PUBSUB_VLAN_OBJ;
-            seq_no_attr_id      = PUBSUB_VLAN_SEQ_NO;
-            last_seq_no_attr_id = PUBSUB_VLAN_LAST_SEQ_NO;
-            timestamp_attr_id   = PUBSUB_VLAN_TIMESTAMP_NS;
-        }
-        else
-        {
-            key_id              = PUBSUB_WEATHER_OBJ;
-            seq_no_attr_id      = PUBSUB_WEATHER_SEQ_NO;
-            last_seq_no_attr_id = PUBSUB_WEATHER_LAST_SEQ_NO;
-            timestamp_attr_id   = PUBSUB_WEATHER_TIMESTAMP_NS;
-        }
-    }
-
+    { "alarm",      {PUBSUB_ALARM_OBJ,      PUBSUB_ALARM_SEQ_NO,      PUBSUB_ALARM_LAST_SEQ_NO,      PUBSUB_ALARM_TIMESTAMP_NS}      },
+    { "connection", {PUBSUB_CONNECTION_OBJ, PUBSUB_CONNECTION_SEQ_NO, PUBSUB_CONNECTION_LAST_SEQ_NO, PUBSUB_CONNECTION_TIMESTAMP_NS} },
+    { "telemetry",  {PUBSUB_TELEMETRY_OBJ,  PUBSUB_TELEMETRY_SEQ_NO,  PUBSUB_TELEMETRY_LAST_SEQ_NO,  PUBSUB_TELEMETRY_TIMESTAMP_NS}  },
+    { "vlan",       {PUBSUB_VLAN_OBJ,       PUBSUB_VLAN_SEQ_NO,       PUBSUB_VLAN_LAST_SEQ_NO,       PUBSUB_VLAN_TIMESTAMP_NS}       },
+    { "weather",    {PUBSUB_WEATHER_OBJ,    PUBSUB_WEATHER_SEQ_NO,    PUBSUB_WEATHER_LAST_SEQ_NO,    PUBSUB_WEATHER_TIMESTAMP_NS}    }
 };
 
 /******************************************************************************/
-class subscriber_context_c
+class subscription_c
+{
+public:
+    cps_api_key_t   key_m;      // CPS key of the object we're subscribing to
+    stats_c         stats_m;    // Statistics object. This is where we keep stats of the received messages (e.g. average transit time...)
+    ids_t           yang_ids_m; // YANG derived Ids. This is used to retrieve attributes from the received messages.
+
+    virtual ~subscription_c() {}
+
+    subscription_c() {}
+
+    subscription_c(const std::string & cat_r)
+    {
+        yang_ids_m = ids.at(cat_r);
+
+        if (!cps_api_key_from_attr_with_qual(&key_m, yang_ids_m.key_id, cps_api_qualifier_TARGET))
+        {
+            std::cerr << "cps_api_key_from_attr_with_qual() failed" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+};
+
+/******************************************************************************/
+class subscriber_c
 {
 protected:
     std::map<std::string, subscription_c>    subscriptions_m;
-    const volatile int                     * sigterm_pm;
-    const str_list_t                       & cat_lst_rm;
+    const volatile int                     & sigterm_rm;
 
 public:
-    virtual ~subscriber_context_c() {}
+    virtual ~subscriber_c() {}
 
-    subscriber_context_c(const volatile int * sigterm_p,
-                         const str_list_t   & cat_lst_r) : cat_lst_rm(cat_lst_r), sigterm_pm(sigterm_p)
+    /**
+     * @param sigterm_r Reference to the variable that gets set when a SIGTERM
+     *                  is detected.
+     *
+     * @param cat_lst_r List of data categories this subscriber is subscribing
+     *                  for. This is a vector containing 1 or more of the
+     *                  strings: "alarm", "connection", "telemetry", "vlan",
+     *                  "weather".
+     */
+    subscriber_c(const volatile int & sigterm_r,
+                         const str_list_t   & cat_lst_r) : sigterm_rm(sigterm_r)
     {
         int rc = module_init();
         if (rc != 0)
@@ -174,20 +92,21 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        for (auto cat : cat_lst_rm)
+        for (auto cat : cat_lst_r)
         {
             subscription_c  s(cat);
-
-            cps_api_object_t obj = cps_api_object_create();
-            cps_api_key_from_attr_with_qual(cps_api_object_key(obj), s.key_id, cps_api_qualifier_TARGET);
-            std::string  path(cps_class_string_from_key(cps_api_object_key(obj), 1));
-            cps_api_object_delete(obj);
-
-            subscriptions_m[path] = s;
+            subscriptions_m[cps_class_string_from_key(&s.key_m, 1)] = s;
         }
     }
 
-    void process_event(cps_api_object_t obj)
+    /**
+     * This is where received messages (i.e. CPS objects) get processed.
+     *
+     * @author mbelanger (8/9/18)
+     *
+     * @param obj
+     */
+    void process_event(cps_api_object_t  obj)
     {
         cps_api_object_attr_t   attr;
         uint32_t                seq_no;
@@ -195,14 +114,14 @@ public:
         uint64_t                timestamp_ns;
         std::string             path(cps_class_string_from_key(cps_api_object_key(obj), 1));
 
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].seq_no_attr_id);
+        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.seq_no);
         seq_no       = cps_api_object_attr_data_u32(attr);
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].last_seq_no_attr_id);
+        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.last_seq_no);
         last_seq_no  = cps_api_object_attr_data_u32(attr);
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].timestamp_attr_id);
+        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.timestamp);
         timestamp_ns = cps_api_object_attr_data_u64(attr);
 
-        subscriptions_m[path].stats.processor(seq_no, last_seq_no, timestamp_ns);
+        subscriptions_m[path].stats_m.processor(seq_no, last_seq_no, timestamp_ns);
     }
 
     virtual void main_loop() = 0;
@@ -228,11 +147,11 @@ static void subscriber(const std::string  & type_r,
                        const str_list_t   & cat_lst_r,
                        const str_list_t   & url_lst_r)
 {
-    subscriber_context_c  * subscriber_context_p;
+    subscriber_c  * subscriber_context_p;
     if (type_r == "redis")
-        subscriber_context_p = new redis_subscriber_context_c(&sigterm, cat_lst_r);
+        subscriber_context_p = new redis_subscriber_c(sigterm, cat_lst_r);
     else
-        subscriber_context_p = new zeromq_subscriber_context_c(&sigterm, cat_lst_r, url_lst_r);
+        subscriber_context_p = new zeromq_subscriber_c(sigterm, cat_lst_r, url_lst_r);
 
     // Tell systemd that this daemon is ready
     sd_notify(0, "READY=1");

@@ -1,14 +1,14 @@
-class redis_publisher_context_c : public publisher_context_c
+class redis_publisher_c : public publisher_c
 {
 public:
-    virtual ~redis_publisher_context_c()
+    virtual ~redis_publisher_c()
     {
     }
 
-    redis_publisher_context_c(unsigned long int    num,
-                              volatile int       * sighup_p,
-                              const volatile int * sigterm_p,
-                              const std::string  & cat_r) : publisher_context_c(num, sighup_p, sigterm_p, cat_r)
+    redis_publisher_c(unsigned long int    num,
+                      volatile int       & sighup_r,
+                      const volatile int & sigterm_r,
+                      const std::string  & cat_r) : publisher_c(num, sighup_r, sigterm_r, cat_r)
     {
         std::cout << "REDIS \"" << cat_r << "\" Publisher. Will be sending " << num << " events." << std::endl;
 
@@ -43,25 +43,27 @@ public:
         {
             pause();
 
-            if (*sigterm_pm != 0)
+            if (sigterm_rm != 0)
             {
                 break;
             }
 
-            if (*sighup_pm)
+            if (sighup_rm)
             {
                 sd_notify(0, "RELOADING=1");
-                *sighup_pm = 0;
+                sighup_rm = 0;
                 sd_notify(0, "READY=1");
                 send_events();
             }
 
-        } while (*sigterm_pm == 0);
+        } while (sigterm_rm == 0);
     }
 
     virtual void send_one_event(benchmark::Object * obj_p)
     {
-        cps_api_event_thread_publish(obj_p->instance());
+        cps_api_return_code_t rc = cps_api_event_thread_publish(obj_p->instance());
+        if (rc != cps_api_ret_code_OK)
+            std::cerr << "cps_api_event_thread_publish() failed with rc=" << rc << std::endl;
     }
 };
 

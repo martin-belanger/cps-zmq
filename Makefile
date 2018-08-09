@@ -45,6 +45,7 @@ CPS_LFLAGS := -pthread -lpthread -L. -ldn_common -levent_log -lcps-api-common -l
 CXX      := g++
 CPPFLAGS += ${PKG_CFLAGS} -I.
 CXXFLAGS += -std=c++11
+#CXXFLAGS += -std=c++17 -Wno-register
 LDFLAGS  += ${PKG_LFLAGS} ${CPS_LFLAGS}
 #LDFLAGS  += -L/usr/local/lib ${PKG_LFLAGS} -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed -ldl -L. -lcps-api-common
 

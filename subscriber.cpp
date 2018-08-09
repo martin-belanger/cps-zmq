@@ -113,15 +113,16 @@ public:
         uint32_t                last_seq_no;
         uint64_t                timestamp_ns;
         std::string             path(cps_class_string_from_key(cps_api_object_key(obj), 1));
+        subscription_c        & subscription = subscriptions_m.at(path);
 
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.seq_no);
+        attr         = cps_api_object_attr_get(obj, subscription.yang_ids_m.seq_no);
         seq_no       = cps_api_object_attr_data_u32(attr);
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.last_seq_no);
+        attr         = cps_api_object_attr_get(obj, subscription.yang_ids_m.last_seq_no);
         last_seq_no  = cps_api_object_attr_data_u32(attr);
-        attr         = cps_api_object_attr_get(obj, subscriptions_m[path].yang_ids_m.timestamp);
+        attr         = cps_api_object_attr_get(obj, subscription.yang_ids_m.timestamp);
         timestamp_ns = cps_api_object_attr_data_u64(attr);
 
-        subscriptions_m[path].stats_m.processor(seq_no, last_seq_no, timestamp_ns);
+        subscription.stats_m.processor(seq_no, last_seq_no, timestamp_ns);
     }
 
     virtual void main_loop() = 0;

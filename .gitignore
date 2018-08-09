@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+benchmark.c
+benchmark.h
+model
+publisher
+subscriber

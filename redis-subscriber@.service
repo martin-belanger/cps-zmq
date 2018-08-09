@@ -1,0 +1,11 @@
+[Unit]
+Description=REDIS %i subscriber
+
+[Service]
+Type=notify
+ExecStart=/home/opxUser/subscriber --type redis --cnf /home/opxUser/%i.ini
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+

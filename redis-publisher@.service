@@ -1,0 +1,11 @@
+[Unit]
+Description=REDIS %i publisher
+
+[Service]
+Type=notify
+ExecStart=/home/opxUser/publisher --type redis --cnf /home/opxUser/%i.ini
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+

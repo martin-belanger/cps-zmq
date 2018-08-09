@@ -1,0 +1,11 @@
+[Unit]
+Description=ZEROMQ %i subscriber
+
+[Service]
+Type=notify
+ExecStart=/home/opxUser/subscriber -t zeromq -c /home/opxUser/%i.ini
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+

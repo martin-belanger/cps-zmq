@@ -1,0 +1,136 @@
+module benchmark {
+	namespace "http://www.dell.com/esg/networking/os10/pubsub-benchmark";
+	prefix pubsub;
+
+	description "Pub/Sub benchmark";
+
+	container Alarm {
+		leaf seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Sequence number.";
+		}
+		leaf last-seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Last Sequence number.";
+		}
+		leaf timestamp_ns {
+			type uint64;
+			units "msec";
+			description "Time at which event was sent";
+		}
+		leaf name {
+			type string;
+			description "Alarm data";
+			default "Intruder alert";
+		}
+	}
+
+	container Connection {
+		leaf seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Sequence number.";
+		}
+		leaf last-seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Last Sequence number.";
+		}
+		leaf timestamp_ns {
+			type uint64;
+			units "msec";
+			description "Time at which event was sent";
+		}
+		leaf name {
+			type string;
+			description "Connection data";
+		}
+	}
+
+	container Telemetry {
+		leaf seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Sequence number.";
+		}
+		leaf last-seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Last Sequence number.";
+		}
+		leaf timestamp_ns {
+			type uint64;
+			units "msec";
+			description "Time at which event was sent";
+		}
+		leaf temperature {
+			type string;
+			description "Enclosure temperature";
+			default "Normal";
+		}
+		leaf Voltage {
+			type string;
+			description "Power supply output voltage";
+			default "Normal";
+		}
+	}
+
+	container Vlan {
+		leaf seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Sequence number.";
+		}
+		leaf last-seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Last Sequence number.";
+		}
+		leaf timestamp_ns {
+			type uint64;
+			units "msec";
+			description "Time at which event was sent";
+		}
+		leaf name {
+			type string;
+			description "Vlan data";
+		}
+	}
+
+	container Weather {
+		leaf seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Sequence number.";
+		}
+		leaf last-seq-no {
+			type uint32 {
+				range "1..4294967295";
+			}
+			description "Last Sequence number.";
+		}
+		leaf timestamp_ns {
+			type uint64 {
+			}
+			description "Time at which event was sent";
+		}
+		leaf name {
+			type string;
+			description "What the weather looks like outside";
+			default "Cloudy with a chance of meatballs";
+		}
+	}
+
+}
+

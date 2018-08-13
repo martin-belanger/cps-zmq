@@ -26,7 +26,7 @@ public:
     {
         int rc;
 
-        std::cout << "ZEROMQ " << join(cat_lst_r, "+") << " subscriber. Connect to: \"" << join(url_lst_r, "+") << "\"." << std::endl;
+        std::cout << "ZMQ " << join(cat_lst_r, "+") << " subscriber. Connect to: \"" << join(url_lst_r, "+") << "\"." << std::endl;
 
         // Initialize ZMQ framework
         ctx_pm = zmq_ctx_new();
@@ -70,8 +70,6 @@ public:
         int               size;
         int               rc;
         zmq_msg_t         message;
-        int64_t           more;
-        size_t            more_size = sizeof more;
         cps_api_object_t  obj = cps_api_object_create();
 
         do

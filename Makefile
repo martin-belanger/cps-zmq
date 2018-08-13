@@ -38,8 +38,8 @@ endif
 # CONFIGURATION
 #####################################################################
 
-PKG_CFLAGS := $(shell pkg-config --cflags libsystemd libzmq)
-PKG_LFLAGS := $(shell pkg-config --libs libsystemd libzmq)
+PKG_CFLAGS := $(shell pkg-config --cflags libsystemd libzmq libnanomsg)
+PKG_LFLAGS := $(shell pkg-config --libs libsystemd libzmq libnanomsg)
 CPS_LFLAGS := -pthread -lpthread -L. -ldn_common -levent_log -lcps-api-common -lcps-class-map-util -lhiredis
 
 CXX      := g++

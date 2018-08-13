@@ -140,6 +140,7 @@ static void signal_hdlr(int signo)
 }
 
 #include "args.cpp"
+#include "subscriber_nano.cpp"
 #include "subscriber_redis.cpp"
 #include "subscriber_zeromq.cpp"
 
@@ -148,18 +149,20 @@ static void subscriber(const std::string  & type_r,
                        const str_list_t   & cat_lst_r,
                        const str_list_t   & url_lst_r)
 {
-    subscriber_c  * subscriber_context_p;
+    subscriber_c  * subscriber_p;
     if (type_r == "redis")
-        subscriber_context_p = new redis_subscriber_c(sigterm, cat_lst_r);
+        subscriber_p = new redis_subscriber_c(sigterm, cat_lst_r);
+    else if (type_r == "zeromq")
+        subscriber_p = new zeromq_subscriber_c(sigterm, cat_lst_r, url_lst_r);
     else
-        subscriber_context_p = new zeromq_subscriber_c(sigterm, cat_lst_r, url_lst_r);
+        subscriber_p = new nano_subscriber_c(sigterm, cat_lst_r, url_lst_r);
 
     // Tell systemd that this daemon is ready
     sd_notify(0, "READY=1");
-    subscriber_context_p->main_loop();
+    subscriber_p->main_loop();
     sd_notify(0, "STOPPING=1");
 
-    delete subscriber_context_p;
+    delete subscriber_p;
 }
 
 /******************************************************************************/

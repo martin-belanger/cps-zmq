@@ -23,7 +23,7 @@ public:
     {
         int rc;
 
-        std::cout << "ZEROMQ \"" << cat_r << "\" Publisher. Will be sending " << num << " events over \"" << url_r << "\"" << std::endl;
+        std::cout << "ZMQ \"" << cat_r << "\" Publisher. Will be sending " << num << " events over \"" << url_r << "\"" << std::endl;
 
         ctx_pm = zmq_ctx_new();
         if (ctx_pm == NULL)

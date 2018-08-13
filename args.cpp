@@ -12,7 +12,7 @@
 #define WHITESPACE    " \t\n\r"
 
 static const str_list_t categories{"alarm", "connection", "telemetry", "vlan", "weather"};
-static const str_list_t type_choices{"redis", "zeromq"};
+static const str_list_t type_choices{"redis", "zeromq", "nano"};
 
 /**
  * @brief Checks that a string starts with a given prefix.
@@ -64,7 +64,7 @@ struct arguments_c
     std::string         cnf_file; // Configuration file
     str_list_t          cat_lst;  // alarm, connection, telemetry, vlan, weather
     str_list_t          url_lst;  // Publisher's URL
-    std::string         type;     // redis, zeromq
+    std::string         type;     // redis, zeromq, nano
     unsigned long int   num;
 
     arguments_c(int argc, char **argv, const char * doc, bool publisher) : num(1000), cnf_file("")
@@ -146,7 +146,7 @@ struct arguments_c
             }
         }
 
-        if (type == "zeromq")
+        if ((type == "zeromq") || (type == "nano"))
         {
             if (cat_lst.size() == 0)
             {

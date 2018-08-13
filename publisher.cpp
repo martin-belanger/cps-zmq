@@ -93,9 +93,9 @@ public:
             obj_pm->set_seq_no(seq_no);
             obj_pm->set_timestamp_ns(now_nsec());
             send_one_event(obj_pm);
-            if ((seq_no % 8) == 0)
+            if ((seq_no % 4) == 0)
             {
-                usleep(2); // trigger a context switch so that subscribers get a chance to process messages
+                usleep(4); // trigger a context switch so that subscribers get a chance to process messages
             }
         }
         //std::cout << "Publisher Done sending " << num_m << " events." << std::endl;
@@ -121,6 +121,7 @@ private:
     }
 };
 
+#include "publisher_nano.cpp"
 #include "publisher_redis.cpp"
 #include "publisher_zeromq.cpp"
 
@@ -139,12 +140,14 @@ static void signal_hdlr(int signo)
 /******************************************************************************/
 static void publisher(const std::string & type_r, unsigned long int num, const std::string & cat_r, const std::string & url_r)
 {
-    publisher_c * publisher_context_p;
+    publisher_c * publisher_p;
 
     if (type_r == "redis")
-        publisher_context_p = new redis_publisher_c(num, sighup, sigterm, cat_r);
+        publisher_p = new redis_publisher_c(num, sighup, sigterm, cat_r);
+    else if (type_r == "zeromq")
+        publisher_p = new zeromq_publisher_c(num, sighup, sigterm, cat_r, url_r);
     else
-        publisher_context_p = new zeromq_publisher_c(num, sighup, sigterm, cat_r, url_r);
+        publisher_p = new nano_publisher_c(num, sighup, sigterm, cat_r, url_r);
 
     struct sigaction  action;
     action.sa_handler = signal_hdlr;
@@ -157,10 +160,10 @@ static void publisher(const std::string & type_r, unsigned long int num, const s
 
     // Tell systemd that this daemon is ready
     sd_notify(0, "READY=1");
-    publisher_context_p->main_loop();
+    publisher_p->main_loop();
     sd_notify(0, "STOPPING=1");
 
-    delete publisher_context_p;
+    delete publisher_p;
 }
 
 /******************************************************************************/
